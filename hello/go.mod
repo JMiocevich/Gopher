@@ -4,4 +4,6 @@ go 1.19
 
 replace example.com/greetings => ../greetings
 
-require example.com/greetings v0.0.0-00010101000000-000000000000
+replace example.com/count => ../count
+
+require example.com/count v0.0.0-00010101000000-000000000000 // indirect
