@@ -3,14 +3,18 @@ package count
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 )
 
 type counter struct {
-	input  io.Reader
-	output io.Writer
+	wordCount        bool
+	wordCountVerbose bool
+	byteCount        bool
+	input            io.Reader
+	output           io.Writer
 }
 
 type option func(*counter) error
@@ -25,8 +29,23 @@ func WithInput(input io.Reader) option {
 	}
 }
 
-func WithInputFromArgs(args []string) option {
+func FromArgs(args []string) option {
 	return func(c *counter) error {
+		fset := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+		wordCount := fset.Bool("w", false, "Count words instead of lines")
+		wordCountVerbose := fset.Bool("v", false, "Count words verbose")
+		byteCount := fset.Bool("b", false, "byte count")
+		fset.SetOutput(c.output)
+		err := fset.Parse(args)
+		if err != nil {
+			return err
+		}
+
+		c.wordCount = *wordCount
+		c.wordCountVerbose = *wordCountVerbose
+		c.byteCount = *byteCount
+
+		args = fset.Args()
 		if len(args) < 1 {
 			return nil
 		}
@@ -64,21 +83,49 @@ func NewCounter(opts ...option) (counter, error) {
 }
 
 func (c counter) Lines() int {
-	lines := 0
+	count := 0
 	scanner := bufio.NewScanner(c.input)
 	for scanner.Scan() {
-		lines++
+		count++
 	}
-	return lines
+	return count
 }
 
-func Lines() int {
+func (c counter) Words() int {
+	count := 0
+	scanner := bufio.NewScanner(c.input)
+	scanner.Split(bufio.ScanWords)
+	for scanner.Scan() {
+		count++
+	}
+	return count
+}
+
+func (c counter) Bytes() int {
+	count := 0
+	scanner := bufio.NewScanner(c.input)
+	scanner.Split(bufio.ScanBytes)
+	for scanner.Scan() {
+		count++
+	}
+	return count
+}
+
+func RunCLI() {
 	c, err := NewCounter(
-		WithInputFromArgs(os.Args[1:]),
+		FromArgs(os.Args[1:]),
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	return c.Lines()
+	if c.wordCount {
+		fmt.Println(c.Words())
+	} else if c.wordCountVerbose {
+		fmt.Println(c.Words(), "Words")
+	} else if c.byteCount {
+		fmt.Println(c.Bytes(), "Bytes")
+	} else {
+		fmt.Println(c.Lines())
+	}
 }
